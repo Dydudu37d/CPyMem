@@ -42,12 +42,6 @@ static inline u0 FishMemCopy(Ptr D, const Ptr S, Size CpSize) {
     #endif
 }
 
-static inline u0 FishMemTrun(Ptr* From, Ptr* To) {
-    Ptr TempFrom = *From;
-    *From = *To;
-    *To = TempFrom;
-}
-
 static inline Ptr FishMemAlloc(Size AllocSize){
     #if defined(IS_WINDOWS)
     return (Ptr)VirtualAlloc(NULL, AllocSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
@@ -131,7 +125,7 @@ static PyObject* FishPingPong(PyObject* self, PyObject* args) {
     PyFrameObject* frame = PyThreadState_Get()->frame;
     if (!frame) return NULL;
     PyObject* locals = frame->f_locals;
-    Py_XINCRE افزایش(locals);
+    Py_XINCREF(locals);
     #endif
 
     if (!locals || !PyDict_Check(locals)) {
@@ -153,19 +147,17 @@ static PyObject* FishPingPong(PyObject* self, PyObject* args) {
         }
         if (key1 && key2) break;
     }
-
+    
     if (key1 && key2) {
         PyDict_SetItem(locals, key1, obj2);
         PyDict_SetItem(locals, key2, obj1);
         
-        #if PY_VERSION_HEX >= 0x030b0000
+        #if PY_VERSION_HEX < 0x030b0000
+        PyFrame_LocalsToFast(frame, 1); 
         #endif
-    } else {
-        PyErr_SetString(PyExc_ValueError, "Could not find variable names in locals! Are they constants?");
-        Py_XDECREF(key1);
-        Py_XDECREF(key2);
-        return NULL;
+        
     }
+
 
     Py_DECREF(key1);
     Py_DECREF(key2);
