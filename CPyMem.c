@@ -116,7 +116,7 @@ static PyObject* FishAlloc(PyObject* self, PyObject* args){
 
 #include <frameobject.h> 
 
-static PyObject* FishDictPingPong(PyObject* self, PyObject* args) {
+static PyObject* FishPingPong(PyObject* self, PyObject* args) {
     PyObject *obj1, *obj2;
     if (!PyArg_ParseTuple(args, "OO", &obj1, &obj2)) return NULL;
 
