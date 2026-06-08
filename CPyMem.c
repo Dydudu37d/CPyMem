@@ -114,12 +114,66 @@ static PyObject* FishAlloc(PyObject* self, PyObject* args){
     return PyCapsule_New(Mem, "CMemory", FishDestructor);
 }
 
-static PyObject* FishPingPong(PyObject* self, PyObject* args) {
-    PyObject* obj1;
-    PyObject* obj2;
+#include <frameobject.h> 
+
+static PyObject* FishDictPingPong(PyObject* self, PyObject* args) {
+    PyObject *obj1, *obj2;
     if (!PyArg_ParseTuple(args, "OO", &obj1, &obj2)) return NULL;
 
-    FishMemTrun((Ptr*)&obj1, (Ptr*)&obj2);
+    #if PY_VERSION_HEX >= 0x030b0000
+    PyFrameObject* frame = PyEval_GetFrame();
+    if (!frame) {
+        PyErr_SetString(PyExc_RuntimeError, "Can't get current Frame!");
+        return NULL;
+    }
+    PyObject* locals = PyFrame_GetLocals(frame);
+    #else
+    PyFrameObject* frame = PyThreadState_Get()->frame;
+    if (!frame) return NULL;
+    PyObject* locals = frame->f_locals;
+    Py_XINCRE افزایش(locals);
+    #endif
+
+    if (!locals || !PyDict_Check(locals)) {
+        PyErr_SetString(PyExc_RuntimeError, "Locals is not a Dict!");
+        return NULL;
+    }
+
+    PyObject *key, *value;
+    Py_ssize_t pos = 0;
+    PyObject *key1 = NULL, *key2 = NULL;
+
+    while (PyDict_Next(locals, &pos, &key, &value)) {
+        if (value == obj1 && !key1) {
+            key1 = key;
+            Py_INCREF(key1);
+        } else if (value == obj2 && !key2) {
+            key2 = key;
+            Py_INCREF(key2);
+        }
+        if (key1 && key2) break;
+    }
+
+    if (key1 && key2) {
+        PyDict_SetItem(locals, key1, obj2);
+        PyDict_SetItem(locals, key2, obj1);
+        
+        #if PY_VERSION_HEX >= 0x030b0000
+        #endif
+    } else {
+        PyErr_SetString(PyExc_ValueError, "Could not find variable names in locals! Are they constants?");
+        Py_XDECREF(key1);
+        Py_XDECREF(key2);
+        return NULL;
+    }
+
+    Py_DECREF(key1);
+    Py_DECREF(key2);
+    
+    #if PY_VERSION_HEX < 0x030b0000
+    Py_DECREF(locals);
+    #endif
+
     Py_RETURN_NONE;
 }
 
