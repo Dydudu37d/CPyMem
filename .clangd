@@ -1,0 +1,10 @@
+CompileFlags:
+  Add: 
+    - -I/data/data/com.termux/files/usr/include/python3.13
+    - -O3
+    - -fPIC
+    - -Wall
+    - -march=native
+    - -x
+    - c
+
