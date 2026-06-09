@@ -116,54 +116,64 @@ static PyObject* FishPingPong(PyObject* self, PyObject* args) {
 
     #if PY_VERSION_HEX >= 0x030b0000
     PyFrameObject* frame = PyEval_GetFrame();
-    if (!frame) {
-        PyErr_SetString(PyExc_RuntimeError, "Can't get current Frame!");
-        return NULL;
-    }
-    PyObject* locals = PyFrame_GetLocals(frame);
+    if (!frame) return NULL;
+    PyObject* locals = PyFrame_GetLocals(frame); 
     #else
     PyFrameObject* frame = PyThreadState_Get()->frame;
     if (!frame) return NULL;
     PyObject* locals = frame->f_locals;
-    Py_XINCREF(locals);
     #endif
 
-    if (!locals || !PyDict_Check(locals)) {
-        PyErr_SetString(PyExc_RuntimeError, "Locals is not a Dict!");
+    if (!locals || !PyMapping_Check(locals)) {
+        PyErr_SetString(PyExc_RuntimeError, "Locals does not support mapping!");
+        Py_XDECREF(locals);
         return NULL;
     }
 
-    PyObject *key, *value;
-    Py_ssize_t pos = 0;
+    PyObject* keys = PyMapping_Keys(locals);
+    if (!keys) {
+        Py_XDECREF(locals);
+        return NULL;
+    }
+
+    Py_ssize_t len = PyList_Size(keys);
     PyObject *key1 = NULL, *key2 = NULL;
 
-    while (PyDict_Next(locals, &pos, &key, &value)) {
+    for (Py_ssize_t i = 0; i < len; i++) {
+        PyObject* key = PyList_GetItem(keys, i);
+        PyObject* value = PyMapping_GetItemString(locals, PyUnicode_AsUTF8(key));
+        
         if (value == obj1 && !key1) {
-            key1 = key;
-            Py_INCREF(key1);
+            key1 = key; Py_INCREF(key1);
         } else if (value == obj2 && !key2) {
-            key2 = key;
-            Py_INCREF(key2);
+            key2 = key; Py_INCREF(key2);
         }
+        Py_XDECREF(value);
         if (key1 && key2) break;
     }
-    
+    Py_DECREF(keys);
+
     if (key1 && key2) {
-        PyDict_SetItem(locals, key1, obj2);
-        PyDict_SetItem(locals, key2, obj1);
+        PyMapping_SetItemString(locals, PyUnicode_AsUTF8(key1), obj2);
+        PyMapping_SetItemString(locals, PyUnicode_AsUTF8(key2), obj1);
         
         #if PY_VERSION_HEX < 0x030b0000
-        PyFrame_LocalsToFast(frame, 1); 
+        PyFrame_LocalsToFast(frame, 1);
         #endif
-        
+    } else {
+        PyErr_SetString(PyExc_ValueError, "Could not find variable names in locals!");
+        Py_XDECREF(key1); Py_XDECREF(key2);
+        #if PY_VERSION_HEX >= 0x030b0000
+        Py_XDECREF(locals);
+        #endif
+        return NULL;
     }
-
 
     Py_DECREF(key1);
     Py_DECREF(key2);
-    
-    #if PY_VERSION_HEX < 0x030b0000
-    Py_DECREF(locals);
+
+    #if PY_VERSION_HEX >= 0x030b0000
+    Py_XDECREF(locals);
     #endif
 
     Py_RETURN_NONE;
